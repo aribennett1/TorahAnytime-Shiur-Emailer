@@ -1,5 +1,5 @@
 # TorahAnytime-Shiur-Emailer
-Google Apps Script to send shiurim as file attachments
+Google Apps Script to email TorahAnytime shiurim as file attachments
 
 How it works: 1) Go to https://www.torahanytime.com/, make an account, and follow some speakers.
 2) Paste the code into Google Apps Scripts, and set a trigger to run every minute.
