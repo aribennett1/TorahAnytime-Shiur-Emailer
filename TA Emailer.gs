@@ -1,38 +1,26 @@
+var orgSubject;
+var orgTitle;
 function main() {
   var emails = GmailApp.search("from: TorahAnytime Following <following@torahanytime.com>");
   for (var i = 0; i < emails.length; i++) {
     var email = emails[i].getMessages();
-    var plainBody = email[0].getPlainBody();        
-    console.log("plainBody: " + plainBody);
-    var subject = email[0].getSubject();
-    console.log("subject: " + subject);
-    var info = getInfo(plainBody);
+    orgSubject = email[0].getSubject();
     for (var j = 0; j < email.length; j++) {
-        email[j].moveToTrash();
+          email[j].moveToTrash();
         }                    
     Logger.log("Email moved to Trash");
-    var title = getTitle(subject);     
-    console.log("Title: " + title);
-    PropertiesService.getScriptProperties().setProperty('orgTitle', title);
-    PropertiesService.getScriptProperties().setProperty('orgSubject', subject);
-    var downloadLink = getDownloadLink(info);
-    var shiur = downloadShiur(downloadLink);
-    shiur.setName(title);
+    orgTitle = getTitle(orgSubject);     
+    var shiur = downloadShiur(getDownloadLink(getInfo(email[0].getPlainBody())));
+    shiur.setName(orgTitle);
     var parts = Math.ceil(shiur.getBytes().length / 26214400);
-    emailShiur(shiur, email[0].getBody(), 1, parts);   
+    emailShiur(shiur, email[0].getBody(), parts);   
   }
   removeFromTrash();
 }
 
 function getInfo(body) {
   body = body.substring(body.indexOf("https://www.torahanytime.com"));  
-  var begIndex = body.indexOf("lectures?") + 11;
-  var endIndex = body.indexOf("]");
-  var id = body.substring(begIndex, endIndex);
-  console.log("id: " + id);
-  var link = "https://www.torahanytime.com/lectures/" + id;
-  var info = UrlFetchApp.fetch(link);
-  return info.getContentText();
+  return UrlFetchApp.fetch(`https://www.torahanytime.com/lectures/${body.substring(body.indexOf("lectures?") + 11, body.indexOf("]"))}`).getContentText();
 }
 
 function getTitle(subject) {
@@ -43,12 +31,7 @@ function getTitle(subject) {
 
 function getDownloadLink(text) {
   var text = text.substring(text.indexOf("audio_url") + 12);
-  console.log("text: ", text);
-  var endIndex = text.indexOf(".mp3\",") + 4;
-  console.log("endIndex: ", endIndex);
-  var downloadLink = text.substring(0, endIndex);
-  console.log("Download Link: ", downloadLink);
-  return downloadLink;
+  return text.substring(0, text.indexOf(`.mp3",`) + 4);
 }
 
 function downloadShiur(downloadLink) {
@@ -56,48 +39,46 @@ function downloadShiur(downloadLink) {
   return audio.getBlob().getAs('audio/mp3');
 }
 
-function emailShiur(shiur, language, counter, parts) {
-  var byteArray = shiur.getBytes();
-  console.log("entered ES");
+function emailShiur(shiur, body, parts) {
+console.log("entered ES");
 const maxFileSize = 26214400; //25MB Max File Size Limit by Gmail
-if (counter <= 1) {
-    var subject = "TA Shiur (File)"; 
-  }
-  else {
-    var subject = "TA Shiur (File - Part " + counter + " of " + parts + ")";
-    shiur.setName(PropertiesService.getScriptProperties().getProperty('orgTitle').replaceAll(".mp3", "") + "-part-" + counter + "-of-" + parts + ".mp3");
-
-  }
-if (byteArray.length <= maxFileSize) {
-  GmailApp.sendEmail("slot700@gmail.com", subject, "Language: " + language + "\n" + shiur.getName() + "\nEnjoy!", {
+  if (parts == 1) {
+    GmailApp.sendEmail(Session.getActiveUser().getEmail(), `TA Shiur (File Attached) - ${orgSubject}`, "", {
       attachments: [shiur],
-      name: 'Automatic Emailer Script'
+      name: 'TorahAnytime Following',
+      htmlBody: body
   });
-  } else {
-    var part1 = byteArray.splice(0, maxFileSize);
-     part1 = Utilities.newBlob(part1, 'audio/mp3', PropertiesService.getScriptProperties().getProperty('orgTitle').replaceAll(".mp3", "") + "-part-" + counter + "-of-" + parts + ".mp3");
-     var part2 = Utilities.newBlob(byteArray, 'audio/mp3', PropertiesService.getScriptProperties().getProperty('orgTitle').replaceAll(".mp3", "") + "-part-" + (counter + 1) + " of " + parts + ".mp3");
-      GmailApp.sendEmail("slot700@gmail.com", "TA Shiur (File - Part " + counter + " of " + parts + ")", "Language: " + language + "\n" + part1.getName() + "\nEnjoy!", {
-        attachments: [part1],
-        name: 'Automatic Emailer Script'
+  console.log("Sent Email");  
+} else {
+  var arrayToSend;
+  var arrayRemainder = shiur.getBytes();
+  for (var i = 0; i < parts; i++) {
+     arrayToSend = arrayRemainder.splice(0, maxFileSize);
+     arrayToSend = Utilities.newBlob(arrayToSend, 'audio/mp3', `${orgTitle.replaceAll(".mp3", "")}-part-${i + 1}-of-${parts}.mp3`);
+      GmailApp.sendEmail(Session.getActiveUser().getEmail(), `TA Shiur (File Attached - Part ${i + 1} of ${parts}) - ${orgSubject}`, "", {
+        attachments: [arrayToSend],
+        name: 'TorahAnytime Following',
+        htmlBody: body
       });
-        emailShiur(part2, language, ++counter, parts);        
+      console.log(`Sent part ${i + 1}`);
+    }        
   }
 }
 
+
 function removeFromTrash() {
   var email = Session.getActiveUser().getEmail();
-  var threads = GmailApp.search("in:trash from:" + email + " subject:TA Shiur older_than:3d");
-  var skipped = 0;
+  var threads = GmailApp.search(`in:trash from:${email} subject:TA Shiur older_than:3d`);
+  var numSkipped = 0;
   for (var i = 0; i < threads.length; i++) {
     try {
       Gmail.Users.Threads.remove(email, threads[i].getId());
     }
     catch (err) {
       console.log(err);
-      skipped++;
+      numSkipped++;
       continue;
     }
   }
-  console.log("Removed " + (threads.length - skipped) + " emails from trash, skipped " + skipped + " emails");
+  console.log(`Removed ${(threads.length - numSkipped)} emails from trash, skipped ${numSkipped} emails`);
 }
