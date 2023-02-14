@@ -23,9 +23,9 @@ function getInfo(body) {
   return UrlFetchApp.fetch(`https://www.torahanytime.com/lectures/${body.substring(body.indexOf("lectures?") + 11, body.indexOf("]"))}`).getContentText();
 }
 
-function getTitle(subject) {
+function getTitle(subject, info) {
   subject = subject.substring(subject.indexOf(" by ") + 4);
-  var title = subject.toLowerCase().replace(/[^a-zA-Z0-9 \u0590-\u05fe-]/g, "").replaceAll(" ", "-") + ".mp3";
+  var title = `${subject.toLowerCase().replace(/\u00A0/g, '-').replace(/[^a-zA-Z0-9 \u0590-\u05fe-]/g, "").replaceAll(" ", "-")}-${info.substring(info.indexOf(`"date_recorded":"`) + 17, info.indexOf(`","dedication"`))}.mp3`;
   return title.replaceAll("---", "-").replaceAll("--", "-").replaceAll("-.mp3", ".mp3");
 }
 
