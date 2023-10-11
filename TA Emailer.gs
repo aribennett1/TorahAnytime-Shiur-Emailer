@@ -19,7 +19,7 @@ function main() {
 }
 
 function getInfo(body) {
-  body = body.substring(body.indexOf("https://www.torahanytime.com"));  
+  body = body.substring(body.indexOf("https://new.torahanytime.com"));  
   return UrlFetchApp.fetch(`https://www.torahanytime.com/lectures/${body.substring(body.indexOf("lectures?") + 11, body.indexOf("]"))}`).getContentText();
 }
 
